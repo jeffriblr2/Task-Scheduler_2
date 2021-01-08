@@ -52,9 +52,9 @@ void task1_run()
 	while(1)
 	{
 		led_on(LED_GREEN);
-		delay(DELAY_COUNT_1S);
+		task_delay(1000);
 		led_off(LED_GREEN);
-		delay(DELAY_COUNT_1S);
+		task_delay(1000);
 	}
 }
 
@@ -63,9 +63,9 @@ void task2_run()
 	while(1)
 	{
 		led_on(LED_ORANGE);
-		delay(DELAY_COUNT_500MS);
+		task_delay(500);
 		led_off(LED_ORANGE);
-		delay(DELAY_COUNT_500MS);
+		task_delay(500);
 	}
 }
 
@@ -74,9 +74,9 @@ void task3_run()
 	while(1)
 	{
 		led_on(LED_BLUE);
-		delay(DELAY_COUNT_250MS);
+		task_delay(250);
 		led_off(LED_BLUE);
-		delay(DELAY_COUNT_250MS);
+		task_delay(250);
 	}
 }
 
@@ -85,9 +85,9 @@ void task4_run()
 	while(1)
 	{
 		led_on(LED_RED);
-		delay(DELAY_COUNT_125MS);
+		task_delay(125);
 		led_off(LED_RED);
-		delay(DELAY_COUNT_125MS);
+		task_delay(125);
 	}
 }
 
@@ -116,34 +116,66 @@ __attribute__((naked)) void init_Scheduler_Stack(uint32_t SHED_StackStart)
     __asm volatile("BX LR");  //Copies value of LR into PC
 }
 
-__attribute__((naked)) void SysTick_Handler(void)
+__attribute__((naked)) void PendSV_Handler(void)
 {
- /*Save context of current task*/
- //Get psp value of the current task
-	__asm volatile("MRS R0,PSP");
-// Using the above PSP value store SF2(R4 TO R11)
-	__asm volatile("STMDB R0!,{R4-R11}"); //R0! points to the address where the first register in the list gets stored
-	//Stmdb-->decrement before storing multiple registers
+	 /*Save context of current task*/
+	 //Get psp value of the current task
+		__asm volatile("MRS R0,PSP");
+	// Using the above PSP value store SF2(R4 TO R11)
+		__asm volatile("STMDB R0!,{R4-R11}"); //R0! points to the address where the first register in the list gets stored
+		//Stmdb-->decrement before storing multiple registers
 
-	__asm volatile("PUSH {LR}");
-//Save current value of PSP
-	__asm volatile("BL save_psp");
+		__asm volatile("PUSH {LR}");
+	//Save current value of PSP
+		__asm volatile("BL save_psp");
 
-	 /*Retrieve context of next task*/
-	//Decide the next task to run
-	__asm volatile("BL update_next_task");
+		 /*Retrieve context of next task*/
+		//Decide the next task to run
+		__asm volatile("BL update_next_task");
 
-	//get its past psp value
-	__asm volatile("BL get_psp");
-	// Using the above PSP value retrieve SF2(R4 TO R11)
-	__asm volatile("LDMIA R0!,{R4-R11}"); //R0! points to the address where the first register in the list gets loaded
-	//ldmia-->load multiple registers and increment after
+		//get its past psp value
+		__asm volatile("BL get_psp");
+		// Using the above PSP value retrieve SF2(R4 TO R11)
+		__asm volatile("LDMIA R0!,{R4-R11}"); //R0! points to the address where the first register in the list gets loaded
+		//ldmia-->load multiple registers and increment after
 
-	//update psp and exit
-	__asm volatile("MSR PSP,R0");
+		//update psp and exit
+		__asm volatile("MSR PSP,R0");
 
-	__asm volatile("POP {LR}");
-	__asm volatile("BX LR");
+		__asm volatile("POP {LR}");
+		__asm volatile("BX LR");
+}
+
+void update_global_tick_count(void)
+{
+	g_tick_count++;
+}
+
+void unblock_tasks(void)
+{
+	for(int i = 1 ; i < Max_tasks ; i++)
+	{
+		if(user_tasks[i].current_state != TASK_READY_STATE)
+		{
+			if(user_tasks[i].block_count == g_tick_count)
+			{
+				user_tasks[i].current_state = TASK_READY_STATE;
+			}
+		}
+
+	}
+}
+
+void SysTick_Handler(void)
+{
+	uint32_t *pICSR = (uint32_t*)0xE000ED04;
+
+    update_global_tick_count();
+
+    unblock_tasks();
+
+    //pend the pendsv exception
+    *pICSR |= ( 1 << 28);
 }
 
 void save_psp(uint32_t current_psp_value)
@@ -153,11 +185,11 @@ void save_psp(uint32_t current_psp_value)
 
 void init_Tasks_Stack()
 {
-	user_tasks[0].current_state = TASK_RUNNING_STATE;
-	user_tasks[1].current_state = TASK_RUNNING_STATE;
-	user_tasks[2].current_state = TASK_RUNNING_STATE;
-	user_tasks[3].current_state = TASK_RUNNING_STATE;
-	user_tasks[4].current_state = TASK_RUNNING_STATE;
+	user_tasks[0].current_state = TASK_READY_STATE;
+	user_tasks[1].current_state = TASK_READY_STATE;
+	user_tasks[2].current_state = TASK_READY_STATE;
+	user_tasks[3].current_state = TASK_READY_STATE;
+	user_tasks[4].current_state = TASK_READY_STATE;
 
 	user_tasks[0].psp_value = idle_stack_start;
 	user_tasks[1].psp_value = t1_stack_start;
@@ -245,12 +277,35 @@ __attribute__((naked)) void switch_sp_to_psp(void)
 
 void update_next_task(void)
 {
-	current_task++;
-	current_task=current_task%Max_tasks;
+	int state = TASK_BLOCKED_STATE;
+
+	for(int i= 0 ; i < (Max_tasks) ; i++)
+	{
+		current_task++;
+	    current_task %= Max_tasks;
+		state = user_tasks[current_task].current_state;
+		if( (state == TASK_READY_STATE) && (current_task != 0) )
+			break;
+	}
+
+	if(state != TASK_READY_STATE)
+		current_task = 0;
+}
+
+void schedule(void)
+{
+	//pend the pendsv exception
+	uint32_t *pICSR = (uint32_t*)0xE000ED04;
+	*pICSR |= ( 1 << 28);
+
 }
 
 void task_delay(uint32_t tick_count)
 {
-	user_tasks[current_task].block_count = g_tick_count + tick_count;
-	user_tasks[current_task].current_state = TASK_BLOCKED_STATE;
+	if(current_task)
+	{
+	   user_tasks[current_task].block_count = g_tick_count + tick_count;
+	   user_tasks[current_task].current_state = TASK_BLOCKED_STATE;
+	   schedule();
+	}
 }

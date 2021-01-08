@@ -59,7 +59,7 @@ typedef struct
 TCB_t user_tasks[Max_tasks];
 
 /* Task States */
-#define TASK_RUNNING_STATE 0x00
+#define TASK_READY_STATE 0x00
 #define TASK_BLOCKED_STATE 0xff
 
 #define Dummy_xpsr 0x01000000U
@@ -73,7 +73,10 @@ uint32_t get_psp(void);
 void save_psp(uint32_t current_psp_value);
 void update_next_task(void);
 void task_delay(uint32_t tick_count);
-
+__attribute__((naked)) void PendSV_Handler(void);
+void update_global_tick_count(void);
+void unblock_tasks(void);
 void idle_task(void);
+void schedule(void);
 
 #endif /* MAIN_H_ */

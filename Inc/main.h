@@ -79,4 +79,8 @@ void unblock_tasks(void);
 void idle_task(void);
 void schedule(void);
 
+//Preventing racing condition by disabling and enabling interrupts
+#define INTERRUPT_DISABLE()  do{__asm volatile ("MOV R0,#0x1"); asm volatile("MSR PRIMASK,R0"); } while(0)
+
+#define INTERRUPT_ENABLE()  do{__asm volatile ("MOV R0,#0x0"); asm volatile("MSR PRIMASK,R0"); } while(0)
 #endif /* MAIN_H_ */

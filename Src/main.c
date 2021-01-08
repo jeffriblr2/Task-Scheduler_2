@@ -302,10 +302,16 @@ void schedule(void)
 
 void task_delay(uint32_t tick_count)
 {
+	//disable interrupt
+	INTERRUPT_DISABLE();
+
 	if(current_task)
 	{
 	   user_tasks[current_task].block_count = g_tick_count + tick_count;
 	   user_tasks[current_task].current_state = TASK_BLOCKED_STATE;
 	   schedule();
 	}
+
+	//enable interrupt
+	INTERRUPT_ENABLE();
 }

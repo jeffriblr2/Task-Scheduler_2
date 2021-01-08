@@ -20,4 +20,4 @@ main.c:259:10:get_psp	4	static
 main.c:263:29:switch_sp_to_psp	0	static,ignoring_inline_asm
 main.c:278:6:update_next_task	16	static
 main.c:295:6:schedule	16	static
-main.c:303:6:task_delay	16	static
+main.c:303:6:task_delay	16	static,ignoring_inline_asm

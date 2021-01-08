@@ -91,6 +91,11 @@ void task4_run()
 	}
 }
 
+void idle_task(void)
+{
+	while(1);
+}
+
 void init_Systick(uint32_t ticks_hz)
 {
 	uint32_t* SRVR = (uint32_t*)0xE000E014;
@@ -154,15 +159,17 @@ void init_Tasks_Stack()
 	user_tasks[3].current_state = TASK_RUNNING_STATE;
 	user_tasks[4].current_state = TASK_RUNNING_STATE;
 
-	user_tasks[0].psp_value = t1_stack_start;
-	user_tasks[1].psp_value = t2_stack_start;
-	user_tasks[2].psp_value = t3_stack_start;
-	user_tasks[3].psp_value = t4_stack_start;
+	user_tasks[0].psp_value = idle_stack_start;
+	user_tasks[1].psp_value = t1_stack_start;
+	user_tasks[2].psp_value = t2_stack_start;
+	user_tasks[3].psp_value = t3_stack_start;
+	user_tasks[4].psp_value = t4_stack_start;
 
-	user_tasks[0].task_handler = task1_run;
-	user_tasks[1].task_handler = task2_run;
-	user_tasks[2].task_handler = task3_run;
-	user_tasks[3].task_handler = task4_run;
+	user_tasks[0].task_handler = idle_task;
+	user_tasks[1].task_handler = task1_run;
+	user_tasks[2].task_handler = task2_run;
+	user_tasks[3].task_handler = task3_run;
+	user_tasks[4].task_handler = task4_run;
 
 	uint32_t *pPsp;
   for(int i=0;i<Max_tasks;i++)
@@ -240,4 +247,10 @@ void update_next_task(void)
 {
 	current_task++;
 	current_task=current_task%Max_tasks;
+}
+
+void task_delay(uint32_t tick_count)
+{
+	user_tasks[current_task].block_count = g_tick_count + tick_count;
+	user_tasks[current_task].current_state = TASK_BLOCKED_STATE;
 }

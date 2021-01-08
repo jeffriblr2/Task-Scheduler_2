@@ -32,15 +32,17 @@ void init_Tasks_Stack();
 #define t2_stack_start   sram_end - (1*task_stack_size)
 #define t3_stack_start   sram_end - (2*task_stack_size)
 #define t4_stack_start   sram_end - (3*task_stack_size)
-#define sched_stack_start sram_end - (4*task_stack_size)
+#define idle_stack_start sram_end - (4*task_stack_size)
+#define sched_stack_start sram_end - (5*task_stack_size)
 
 //Systick clock
 #define hsi_clk      16000000U
 #define systick_clk  hsi_clk
 #define ticks        1000U
+uint32_t g_tick_count = 0; //global tick count
 
 //Other Macros
-#define Max_tasks   4
+#define Max_tasks   5 // 4 user tasks + 1 idle task
 //uint32_t psp_of_tasks[Max_tasks]={t1_stack_start,t2_stack_start,t3_stack_start,t4_stack_start};
 //uint32_t taskAddress[Max_tasks];
 
@@ -63,12 +65,15 @@ TCB_t user_tasks[Max_tasks];
 #define Dummy_xpsr 0x01000000U
 uint32_t *SHCSR = (uint32_t*)0xE000ED24;
 uint32_t *UFSR = (uint32_t*)0xE000ED2A;
-uint8_t current_task=0;//task 1 running
+uint8_t current_task=1;//task 1 running
 
 void enable_processor_faults(void);
 __attribute__((naked)) void switch_sp_to_psp(void);
 uint32_t get_psp(void);
 void save_psp(uint32_t current_psp_value);
 void update_next_task(void);
+void task_delay(uint32_t tick_count);
+
+void idle_task(void);
 
 #endif /* MAIN_H_ */
